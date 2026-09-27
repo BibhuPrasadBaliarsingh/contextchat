@@ -1,8 +1,8 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-const API_URL = "http://10.118.138.168:5000/api";
-// const API_URL = "https://contextchat-drsg.onrender.com/api";
+// const API_URL = "http://10.118.138.168:5000/api";
+const API_URL = "https://contextchat-drsg.onrender.com/api";
 
 
 const api = axios.create({
