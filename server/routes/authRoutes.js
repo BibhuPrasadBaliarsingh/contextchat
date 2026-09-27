@@ -3,6 +3,7 @@ const express = require("express");
 const {
   registerUser,
   loginUser,
+  googleAuth,
   getCurrentUser,
 } = require("../controllers/authController");
 
@@ -14,6 +15,8 @@ router.post("/register", registerUser);
 
 router.post("/login", loginUser);
 
+router.post("/google", googleAuth);
+
 router.get("/me", protect, getCurrentUser);
 
-module.exports = router;
+module.exports = router;

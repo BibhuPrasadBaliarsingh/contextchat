@@ -1,7 +1,9 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -11,6 +13,7 @@ import {
   View,
 } from "react-native";
 import api from "../services/api";
+import { useGoogleAuth } from "../hooks/useGoogleAuth";
 export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,6 +24,37 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [error, setError] = useState("");
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleEmailInput, setGoogleEmailInput] = useState("");
+  const [googleNameInput, setGoogleNameInput] = useState("");
+
+  const {
+    handleGoogleSignIn,
+    handleDirectGoogleLogin,
+    isConfigured,
+    loading: googleLoading,
+    error: googleError,
+  } = useGoogleAuth();
+
+  const onPressGoogleButton = async () => {
+    if (!isConfigured) {
+      setShowGoogleModal(true);
+      return;
+    }
+    await handleGoogleSignIn();
+  };
+
+  const submitDirectGoogleLogin = async () => {
+    if (!googleEmailInput.trim() || !googleEmailInput.includes("@")) {
+      setError("Please enter a valid Google email address.");
+      return;
+    }
+    setShowGoogleModal(false);
+    await handleDirectGoogleLogin(
+      googleEmailInput.trim(),
+      googleNameInput.trim() || name.trim() || "Google User"
+    );
+  };
 
   const handleRegister = async () => {
     setError("");
@@ -182,7 +216,9 @@ export default function RegisterScreen() {
 
             {/* Error */}
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error || googleError ? (
+              <Text style={styles.error}>{error || googleError}</Text>
+            ) : null}
 
             {/* Register */}
 
@@ -207,15 +243,19 @@ export default function RegisterScreen() {
 
             <Pressable
               style={styles.googleButton}
-              onPress={() => {
-                console.log("Google registration will be added later.");
-              }}
+              onPress={onPressGoogleButton}
+              disabled={googleLoading}
             >
-              <Text style={styles.googleIcon}>G</Text>
-
-              <Text style={styles.googleButtonText}>
-                Continue with Google
-              </Text>
+              {googleLoading ? (
+                <ActivityIndicator size="small" color="#111111" />
+              ) : (
+                <>
+                  <Text style={styles.googleIcon}>G</Text>
+                  <Text style={styles.googleButtonText}>
+                    Continue with Google
+                  </Text>
+                </>
+              )}
             </Pressable>
 
             {/* Login */}
@@ -232,6 +272,57 @@ export default function RegisterScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Google Modal */}
+      <Modal
+        visible={showGoogleModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowGoogleModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Google Mobile Sign-In</Text>
+            <Text style={styles.modalSub}>
+              Enter your Google Account email to test Google registration/login:
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Google Email (e.g. user@gmail.com)"
+              placeholderTextColor="#999999"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={googleEmailInput}
+              onChangeText={setGoogleEmailInput}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Your Name (Optional)"
+              placeholderTextColor="#999999"
+              value={googleNameInput}
+              onChangeText={setGoogleNameInput}
+            />
+
+            <Pressable
+              style={styles.registerButton}
+              onPress={submitDirectGoogleLogin}
+            >
+              <Text style={styles.registerButtonText}>
+                Continue with Google
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={{ marginTop: 12, alignItems: "center" }}
+              onPress={() => setShowGoogleModal(false)}
+            >
+              <Text style={{ color: "#666666" }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -377,6 +468,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginRight: 10,
+    color: "#4285F4",
   },
 
   googleButtonText: {
@@ -398,5 +490,33 @@ const styles = StyleSheet.create({
   loginTextBold: {
     color: "#111111",
     fontWeight: "700",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+
+  modalCard: {
+    width: "100%",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 24,
+  },
+
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111111",
+    marginBottom: 8,
+  },
+
+  modalSub: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 16,
   },
 });

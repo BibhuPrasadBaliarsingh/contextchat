@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const axios = require("axios");
 const User = require("../models/User");
 
 const registerUser = async (req, res) => {
@@ -150,7 +151,115 @@ const loginUser = async (req, res) => {
   }
 };
 
+const googleAuth = async (req, res) => {
+  try {
+    const { idToken, accessToken, googleId, email, name, profileImage } = req.body;
 
+    let userEmail = email;
+    let userName = name;
+    let userGoogleId = googleId;
+    let userPicture = profileImage;
+
+    if (idToken) {
+      try {
+        const googleRes = await axios.get(
+          `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
+        );
+        if (googleRes.data && googleRes.data.email) {
+          userEmail = googleRes.data.email;
+          userName = googleRes.data.name || name;
+          userGoogleId = googleRes.data.sub || googleId;
+          userPicture = googleRes.data.picture || profileImage;
+        }
+      } catch (err) {
+        console.warn("Google idToken verification warning:", err.message);
+      }
+    } else if (accessToken) {
+      try {
+        const googleRes = await axios.get(
+          "https://www.googleapis.com/oauth2/v3/userinfo",
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        if (googleRes.data && googleRes.data.email) {
+          userEmail = googleRes.data.email;
+          userName = googleRes.data.name || name;
+          userGoogleId = googleRes.data.sub || googleId;
+          userPicture = googleRes.data.picture || profileImage;
+        }
+      } catch (err) {
+        console.warn("Google accessToken verification warning:", err.message);
+      }
+    }
+
+    if (!userEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Google authentication failed. Email is required.",
+      });
+    }
+
+    const normalizedEmail = userEmail.trim().toLowerCase();
+
+    let user = await User.findOne({
+      $or: [{ googleId: userGoogleId }, { email: normalizedEmail }],
+    });
+
+    if (user) {
+      if (!user.googleId && userGoogleId) {
+        user.googleId = userGoogleId;
+      }
+      if (userPicture && (!user.profileImage || user.profileImage === "")) {
+        user.profileImage = userPicture;
+      }
+      user.isOnline = true;
+      user.lastSeen = new Date();
+      await user.save();
+    } else {
+      user = await User.create({
+        name: (userName || "Google User").trim(),
+        email: normalizedEmail,
+        googleId: userGoogleId || `google_${Date.now()}`,
+        profileImage: userPicture || "",
+        authProvider: "google",
+        isOnline: true,
+        lastSeen: new Date(),
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user._id,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Google authentication successful.",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage,
+        authProvider: user.authProvider,
+        isOnline: user.isOnline,
+        lastSeen: user.lastSeen,
+      },
+    });
+  } catch (error) {
+    console.error("Google auth error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong during Google registration/login.",
+    });
+  }
+};
 
 const getCurrentUser = async (req, res) => {
   try {
@@ -180,5 +289,6 @@ const getCurrentUser = async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  googleAuth,
   getCurrentUser,
-};
+};

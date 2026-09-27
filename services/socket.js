@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 
 const SOCKET_URL = "http://10.118.138.168:5000";
+// const SOCKET_URL = "https://contextchat-drsg.onrender.com";
 
 let socket = null;
 

@@ -1,7 +1,9 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,13 +12,26 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
+import { useGoogleAuth } from "../hooks/useGoogleAuth";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleEmailInput, setGoogleEmailInput] = useState("");
+  const [googleNameInput, setGoogleNameInput] = useState("");
+
   const { login } = useAuth();
+  const {
+    handleGoogleSignIn,
+    handleDirectGoogleLogin,
+    isConfigured,
+    loading: googleLoading,
+    error: googleError,
+  } = useGoogleAuth();
 
   const handleLogin = async () => {
     setError("");
@@ -47,6 +62,28 @@ export default function LoginScreen() {
       );
     }
   };
+
+  const onPressGoogleButton = async () => {
+    if (!isConfigured) {
+      setShowGoogleModal(true);
+      return;
+    }
+    await handleGoogleSignIn();
+  };
+
+  const submitDirectGoogleLogin = async () => {
+    if (!googleEmailInput.trim() || !googleEmailInput.includes("@")) {
+      setError("Please enter a valid Google email address.");
+      return;
+    }
+    setShowGoogleModal(false);
+    await handleDirectGoogleLogin(
+      googleEmailInput.trim(),
+      googleNameInput.trim() || "Google User"
+    );
+  };
+
+  const displayError = error || googleError;
 
   return (
     <KeyboardAvoidingView
@@ -99,10 +136,33 @@ export default function LoginScreen() {
             </Pressable>
           </View>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
 
           <Pressable style={styles.loginButton} onPress={handleLogin}>
             <Text style={styles.loginButtonText}>Login</Text>
+          </Pressable>
+
+          <View style={styles.orContainer}>
+            <View style={styles.line} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.line} />
+          </View>
+
+          <Pressable
+            style={styles.googleButton}
+            onPress={onPressGoogleButton}
+            disabled={googleLoading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator size="small" color="#111111" />
+            ) : (
+              <>
+                <Text style={styles.googleIcon}>G</Text>
+                <Text style={styles.googleButtonText}>
+                  Sign in with Google
+                </Text>
+              </>
+            )}
           </Pressable>
 
           <Pressable
@@ -116,6 +176,55 @@ export default function LoginScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Google Modal */}
+      <Modal
+        visible={showGoogleModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowGoogleModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Google Mobile Sign-In</Text>
+            <Text style={styles.modalSub}>
+              Enter your Google Account email to test Google registration/login:
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Google Email (e.g. user@gmail.com)"
+              placeholderTextColor="#999999"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={googleEmailInput}
+              onChangeText={setGoogleEmailInput}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Your Name (Optional)"
+              placeholderTextColor="#999999"
+              value={googleNameInput}
+              onChangeText={setGoogleNameInput}
+            />
+
+            <Pressable
+              style={styles.loginButton}
+              onPress={submitDirectGoogleLogin}
+            >
+              <Text style={styles.loginButtonText}>Continue with Google</Text>
+            </Pressable>
+
+            <Pressable
+              style={{ marginTop: 12, alignItems: "center" }}
+              onPress={() => setShowGoogleModal(false)}
+            >
+              <Text style={{ color: "#666666" }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -223,6 +332,48 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  orContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 18,
+  },
+
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#eeeeee",
+  },
+
+  orText: {
+    marginHorizontal: 12,
+    color: "#999999",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  googleButton: {
+    height: 52,
+    borderWidth: 1,
+    borderColor: "#dddddd",
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  googleIcon: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginRight: 10,
+    color: "#4285F4",
+  },
+
+  googleButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#222222",
+  },
+
   registerButton: {
     alignItems: "center",
     marginTop: 22,
@@ -237,4 +388,32 @@ const styles = StyleSheet.create({
     color: "#111111",
     fontWeight: "700",
   },
-});
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+
+  modalCard: {
+    width: "100%",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 24,
+  },
+
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111111",
+    marginBottom: 8,
+  },
+
+  modalSub: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 16,
+  },
+});
